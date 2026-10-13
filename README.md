@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TaskFlow
 
-## Getting Started
+TaskFlow is a personal task web application. A registered user can create, search, filter, edit, complete, and delete only their own tasks. Creating a task tries to email that user. The user can also upload a profile photo.
 
-First, run the development server:
+This repository is a course project. It is not a verified public deployment.
+
+## Features that are implemented
+
+- Home, registration, and login pages.
+- Email-and-password accounts with Better Auth.
+- A dashboard that requires a session.
+- Task create, list, edit, status change, and delete.
+- Server-side checks so task queries include the signed-in user id.
+- Browser search across titles and descriptions, combined with status filters.
+- Four counts: total, completed, pending, and in progress.
+- A confirmation dialog before delete.
+- Profile photo upload stored as a file plus a URL on the user record.
+- A creation email that does not block the save if sending fails.
+
+## Not implemented
+
+- Due dates, priorities, categories, and task assignment.
+- A scheduling calendar.
+- Magic-link login.
+- An automated test suite.
+- A verified production deployment.
+
+## Technology
+
+| Piece | Choice |
+| --- | --- |
+| Framework | Next.js 15 App Router |
+| Language | TypeScript |
+| UI | React 19 and Tailwind CSS 4 |
+| Accounts | Better Auth with the MongoDB adapter |
+| Tasks | Mongoose |
+| Database | MongoDB, database name `taskflow` |
+| Email | Resend |
+
+## Setup
+
+Prerequisites: Node.js, npm, and a MongoDB database. Resend is required only for email.
+
+```bash
+npm install
+```
+
+Create `.env` in the project root. Do not commit it.
+
+```text
+MONGODB_URI=<mongodb-connection-string>
+BETTER_AUTH_SECRET=<random-string-at-least-32-characters>
+BETTER_AUTH_URL=<base-url-including-port>
+RESEND_API_KEY=<resend-api-key>
+EMAIL_FROM=<sender-address>
+EMAIL_TEST_TO=<address-for-the-test-script-only>
+```
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open the local URL printed by the dev server.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Checks:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npx tsc --noEmit
+npm run build
+```
 
-## Learn More
+## Documentation
 
-To learn more about Next.js, take a look at the following resources:
+| Document | Contents |
+| --- | --- |
+| [docs/TaskFlow_Project_Report.md](docs/TaskFlow_Project_Report.md) | Academic report |
+| [docs/RESEARCH_AND_DESIGN.md](docs/RESEARCH_AND_DESIGN.md) | Research gaps and design notes |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | How to use the application |
+| [docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) | Architecture and API |
+| [docs/TEST_PLAN.md](docs/TEST_PLAN.md) | Cases and what has actually been observed |
+| [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) | GitHub and Vercel outline |
+| [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) | What you still need to add |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Security note
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Task routes take the owner from the session. Do not put connection strings, auth secrets, or API keys in documentation or screenshots.
