@@ -1,11 +1,8 @@
 
 import mongoose from "mongoose";
+import { getMongoDbUri } from "@/lib/mongodb-uri";
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error("MONGODB_URI is missing from .env");
-}
+const MONGODB_URI = getMongoDbUri();
 
 const globalWithMongoose = globalThis as typeof globalThis & {
   mongooseConnection?: Promise<typeof mongoose>;
@@ -17,7 +14,7 @@ export async function connectMongoose() {
   }
 
   if (!globalWithMongoose.mongooseConnection) {
-    globalWithMongoose.mongooseConnection = mongoose.connect(MONGODB_URI as string, {
+    globalWithMongoose.mongooseConnection = mongoose.connect(MONGODB_URI, {
       dbName: "taskflow",
     });
   }

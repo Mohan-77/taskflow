@@ -1,11 +1,8 @@
 
 import { Db, MongoClient } from "mongodb";
+import { getMongoDbUri } from "@/lib/mongodb-uri";
 
-const uri = process.env.MONGODB_URI;
-
-if (!uri) {
-  throw new Error("MONGODB_URI is missing from .env");
-}
+const uri = getMongoDbUri();
 
 declare global {
   var _mongoClient: MongoClient | undefined;
@@ -26,3 +23,4 @@ const db: Db = client.db("taskflow");
 
 export { client, clientPromise, db };
 export default clientPromise;
+    
