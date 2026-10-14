@@ -2,7 +2,9 @@
 
 This guide explains how to use TaskFlow. Setup for developers is in [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) and Chapter 7 of [TaskFlow_Project_Report.md](./TaskFlow_Project_Report.md).
 
-Use the address printed by the development server. It is often `http://localhost:3000`, but the port can differ.
+The live site is [https://taskflow-gules-eight-93.vercel.app/](https://taskflow-gules-eight-93.vercel.app/).
+
+For local development, use the address printed by the development server. It is often `http://localhost:3000`, but the port can differ.
 
 ## Create an account
 
@@ -75,7 +77,7 @@ The checkbox is separate. It marks the task **Completed**. Choose it again to se
 
 In the sidebar, choose the photo or **Change photo**. Use a JPG, PNG, WEBP, or GIF file of 2 MB or less. A short notice says “Profile photo updated.” when the save succeeds.
 
-This upload was not clicked through when the guide was written. If it fails, note the message and continue using the initials avatar.
+If the file is the wrong type, the page says “Use a JPG, PNG, WEBP, or GIF image.” If it is too large, it says “Image must be 2 MB or smaller.” If the save fails, it says “Could not save the profile photo.” or “Could not upload the photo.” The initials avatar remains until a photo is saved. Only the signed-in account can load that photo.
 
 ## Troubleshooting
 
@@ -87,6 +89,7 @@ This upload was not clicked through when the guide was written. If it fails, not
 | “Task title is required.” | The title is empty or only spaces. |
 | “Request failed. Check your connection and try again.” | The browser did not get a response. Check that the server is running. |
 | A red message from the server | Read the sentence. It is the API `message`, such as an invalid status or a missing task. |
-| The task exists but no email arrived | Mail is optional for saving the task. The sender and your account email must be allowed by the email provider. |
+| The task exists but no email arrived | Mail is optional for saving the task. Delivery on the live site has not been recorded as verified. The sender and your account email must be allowed by the email provider. |
+| “Could not upload the photo.” | The photo was not saved. Read any more specific message, then try a JPG, PNG, WEBP, or GIF of 2 MB or less. |
 
 TaskFlow does not have due dates, priorities, categories, or shared task lists.

@@ -60,7 +60,7 @@ Decisions that are visible in the code:
 - The dashboard layout redirects when `getServerSession` returns no session. A root middleware file is not used.
 - Task `userId` is taken from the session on create and is part of every lookup.
 - Email failure is logged and does not change the HTTP 201 response.
-- Profile images are files in `public/avatars`, with the URL stored on the Better Auth user. The task schema is unchanged.
+- Profile images are stored in MongoDB, one document per user, and served by `GET /api/profile/avatar` to that user only. The task schema is unchanged.
 - Search filters tasks already loaded in the browser. It does not add a search API.
 
 ## Verified references

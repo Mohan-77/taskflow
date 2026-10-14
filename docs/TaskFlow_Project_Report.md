@@ -6,7 +6,7 @@
 
 **Prepared from:** the TaskFlow source repository
 
-**Documentation date:** 13 October 2026
+**Documentation date:** 14 October 2026. The live site is https://taskflow-gules-eight-93.vercel.app/.
 
 | Placeholder | Fill in before submission |
 | --- | --- |
@@ -17,7 +17,7 @@
 | Supervisor | [Supervisor name] |
 | Submission date | [Submission date] |
 
-This report describes the application that is present in the repository. It does not invent surveys, interviews, statistics, or test results. Where a statement is a design explanation rather than a recorded study, it is labelled as a design rationale. Where a check was seen during local development but was not repeated as a formal test record, it is labelled Observed. Where no evidence exists, the item is labelled Not tested.
+This report describes the application that is present in the repository. It does not invent surveys, interviews, statistics, or test results. Where a statement is a design explanation rather than a recorded study, it is labelled as a design rationale. Where a check was seen during local development but was not repeated as a formal test record, it is labelled Observed. Where the author reported a result on 14 October 2026 and this report did not repeat it, it is labelled Reported. Where no evidence exists, the item is labelled Not tested.
 
 The author should replace the placeholders above and attach personal evidence before submission. This document is a description of the code. It is not, by itself, proof of research or testing performed by the author.
 
@@ -84,7 +84,6 @@ The home page states the product aim in user language: “Organize your tasks, m
 - Shared workspaces, teams, or roles beyond “this user” and “not this user.”
 - Magic-link login. The authentication configuration enables email and password only.
 - An automated test suite.
-- A verified production deployment.
 
 ### 1.8 Intended users
 
@@ -162,7 +161,7 @@ These are properties the implementation aims at. They were not measured with a b
 
 ### 2.7 User needs and system constraints
 
-A user needs an account, a modern browser, and a running TaskFlow server connected to MongoDB. Email additionally needs Resend configuration. Profile photos are written to the server’s `public/avatars` directory, so that directory must be writable. This storage choice is local to the machine that runs the server. It is a constraint, not a cloud file store.
+A user needs an account, a modern browser, and a running TaskFlow server connected to MongoDB. Email additionally needs Resend configuration. Profile photos are stored in MongoDB and served only to the signed-in user. Successful email delivery on the live site has not been recorded.
 
 ### 2.8 Assumptions and limitations
 
@@ -176,9 +175,9 @@ A user needs an account, a modern browser, and a running TaskFlow server connect
 
 - There is no automated test suite.
 - There is no recorded primary research.
-- Production deployment was not verified.
+- The live site is https://taskflow-gules-eight-93.vercel.app/. The author reported on 14 October 2026 that the main account, task, and profile-photo features were tested there. Screenshots are not stored in the repository.
+- Creation-email delivery on the live site is not verified.
 - The dashboard list is loaded by the server page, not by `GET /api/tasks`, although that route exists.
-- Profile photo upload was implemented but was not exercised in the browser while this report was written.
 
 ## Chapter 3: Technology Selection
 
@@ -235,7 +234,7 @@ No test runner, component library, or cloud file-storage SDK is installed.
 
 ### 4.1 System overview
 
-A browser talks to a Next.js server. The server checks the Better Auth session, reads or writes the `tasks` collection, and may call Resend. Profile images are files under `public/avatars`, and the image URL is stored on the Better Auth user.
+A browser talks to a Next.js server. The server checks the Better Auth session, reads or writes the `tasks` collection and the profile-photo collection, and may call Resend. The profile-photo URL stored on the user is `/api/profile/avatar`.
 
 ```mermaid
 flowchart LR
@@ -243,16 +242,16 @@ flowchart LR
   Next[Next.js App Router]
   Auth[Better Auth session]
   Tasks[(MongoDB tasks)]
+  Photos[(MongoDB profile photos)]
   Users[(MongoDB user session account)]
   Mail[Resend]
-  Files[public/avatars]
 
   Browser --> Next
   Next --> Auth
   Auth --> Users
   Next --> Tasks
+  Next --> Photos
   Next --> Mail
-  Next --> Files
 ```
 
 ### 4.2 Major modules
@@ -265,7 +264,7 @@ flowchart LR
 | Dashboard | Counts, search, filters, layout | `app/dashboard/*`, `components/dashboard/*` |
 | Tasks | Create, edit, delete, status | `components/tasks/*`, `app/api/tasks/*`, `lib/models/Task.ts` |
 | Email | Notify after create | `lib/email.ts` |
-| Profile photo | Save an image and set the user image | `app/api/profile/avatar/route.ts`, `ProfilePhoto.tsx` |
+| Profile photo | Save an image for the signed-in user and set the user image URL | `app/api/profile/avatar/route.ts`, `lib/models/ProfilePhoto.ts`, `ProfilePhoto.tsx` |
 
 ### 4.3 Authentication and authorization flow
 
@@ -318,7 +317,8 @@ All task routes return JSON. Success bodies use `success: true`. Errors use `suc
 | `GET /api/tasks/[id]` | Session required | 200 `{ success, task }` | 400 invalid id; 401; 404 not found; 500 |
 | `PUT /api/tasks/[id]` | Session required | 200 `{ success, task }` | 400 invalid id, JSON, title, description, status, or empty update; 401; 404; 500 |
 | `DELETE /api/tasks/[id]` | Session required | 200 `{ success: true }` | 401; 404 for an invalid id or a missing task; 500 |
-| `POST /api/profile/avatar` | Session required | 200 `{ success, image }` | 400 bad file; 401; 500 is not given a special message beyond a thrown error |
+| `POST /api/profile/avatar` | Session required | 200 `{ success, image }` | 400 invalid file; 401; 500 “Could not save the profile photo.” |
+| `GET /api/profile/avatar` | Session required, owner only | 200 image bytes | 401; 404 “No profile photo is saved.”; 500 “Could not load the profile photo.” |
 | `GET` and `POST /api/auth/[...all]` | Better Auth | Better Auth’s own responses | Better Auth’s own errors |
 
 `DELETE` uses 404 “Task not found.” for an id that is not a valid MongoDB ObjectId, and it does so before connecting. `GET` and `PUT` use 400 “Invalid task id.” for the same kind of id. That difference is present in `app/api/tasks/[id]/route.ts`.
@@ -339,7 +339,9 @@ The dashboard does not call `GET /api/tasks` when it paints the list. `app/dashb
 
 There is no Mongoose relation to a User model. `userId` is a string copy of `session.user.id`.
 
-**Better Auth collections.** The adapter, not Mongoose, stores users, sessions, and accounts. The project does not define those schemas itself. The user record includes the fields Better Auth provides, including `name`, `email`, and `image`. This report does not dump live database contents.
+**Profile photos.** Mongoose model name `ProfilePhoto`. One document per `userId`, enforced by a unique index. Fields are `userId`, `contentType` (`image/png`, `image/jpeg`, `image/gif`, or `image/webp`), `data` (the image bytes), and timestamps. Replacing a photo updates that document.
+
+**Better Auth collections.** The adapter, not Mongoose, stores users, sessions, and accounts. The project does not define those schemas itself. The user record includes the fields Better Auth provides, including `name`, `email`, and `image`. After a photo upload, `image` is the URL `/api/profile/avatar?v=<time>`. This report does not dump live database contents.
 
 ### 4.7 Validation and error-handling design
 
@@ -380,6 +382,8 @@ lib/
   db.ts                    Native MongoDB client
   mongoose.ts              Mongoose connection
   models/Task.ts
+  models/ProfilePhoto.ts
+  mongodb-uri.ts           Selects MONGODB_URI_PRO, MONGODB_URI_DEV, or MONGODB_URI
   email.ts
   session.ts
 scripts/send-test-email.ts
@@ -418,11 +422,13 @@ This search does not send a new database query. It filters the tasks already pas
 
 ### 5.7 Profile image
 
-`POST /api/profile/avatar` requires a session. It accepts one file field named `image`. The file must be at most 2 MB. The route checks both the declared type and the file bytes for PNG, JPEG, GIF, or WEBP. It writes `public/avatars/<sanitizedUserId>.<ext>` and deletes older files for that user with the other extensions. The response contains a URL such as `/avatars/<id>.png?v=<time>`.
+`POST /api/profile/avatar` requires a session. It accepts one file field named `image`. The file must be at most 2 MB. The route checks both the declared type and the file bytes for PNG, JPEG, GIF, or WEBP. It upserts one MongoDB document for `session.user.id`, so replacing a photo does not create a second document. The response image URL is `/api/profile/avatar?v=<time>`.
 
-`ProfilePhoto` then sends that URL to `POST /api/auth/update-user`, which is Better Auth’s existing user-update route. The image string is stored on the user. The task schema is not changed.
+`GET /api/profile/avatar` returns those bytes only when the same signed-in user requests them. A missing photo returns 404 “No profile photo is saved.”
 
-This upload path was not exercised in the browser while this report was written.
+`ProfilePhoto` then sends that URL to `POST /api/auth/update-user`, which is Better Auth’s existing user-update route. The image string is stored on the user. The task schema is not changed. The dashboard shows the image only when the stored URL starts with `/api/profile/avatar`.
+
+The author reported on 14 October 2026 that this upload works locally and that the live site’s main features were tested. This report does not include a screenshot of the upload.
 
 ### 5.8 Email notification
 
@@ -436,13 +442,15 @@ Names only. Values must stay out of the report and out of Git. `.gitignore` igno
 
 | Name | Used by |
 | --- | --- |
-| `MONGODB_URI` | `lib/db.ts`, `lib/mongoose.ts` |
+| `MONGODB_URI` | Development fallback in `lib/mongodb-uri.ts` |
+| `MONGODB_URI_DEV` | Development URI when set. Otherwise `MONGODB_URI` is used |
+| `MONGODB_URI_PRO` | Production URI. Required when `NODE_ENV` is `production`. There is no fallback |
 | `BETTER_AUTH_SECRET` | Better Auth, if not passed in code. This project does not pass `secret` in `lib/auth.ts`. |
-| `BETTER_AUTH_URL` | Better Auth base URL. Not set in `lib/auth.ts`, so the library expects the environment or derives an origin. |
+| `BETTER_AUTH_URL` | Better Auth base URL and trusted origin. Not set in `lib/auth.ts`. For the live site it must be `https://taskflow-gules-eight-93.vercel.app` |
 | `RESEND_API_KEY` | `lib/email.ts` |
 | `EMAIL_FROM` | `lib/email.ts` |
 | `EMAIL_TEST_TO` | `scripts/send-test-email.ts` only |
-| `NODE_ENV` | `lib/db.ts`, to reuse the Mongo client in development |
+| `NODE_ENV` | `lib/mongodb-uri.ts` and `lib/db.ts` |
 
 `BETTER_AUTH_SECRET` should be at least 32 characters. That warning comes from the installed Better Auth package, not from a custom check in TaskFlow.
 
@@ -451,15 +459,15 @@ Names only. Values must stay out of the report and out of Git. `.gitignore` igno
 - Task ownership comes from the session, not the request body.
 - Queries combine the task id with `userId`.
 - Password length is enforced by Better Auth on registration even if the browser check is bypassed.
-- The profile upload sanitizes the user id before using it as a file name and checks file bytes.
+- The profile upload checks file bytes and size, stores the bytes against the session user id, and does not accept another user’s id.
 - Email errors do not include the API key in the logged message. The helper logs `error.name`.
-- The avatar directory is listed in `.gitignore`.
+- `.env` files are listed in `.gitignore`. `/public/avatars/*` remains ignored, but the current upload route does not write there.
 
 The application does not add its own rate limiting, security headers, or virus scanning. Those absences are limitations, not hidden features.
 
 ## Chapter 6: User Manual
 
-The commands below assume the application is already running on the developer’s machine. A common local address is `http://localhost:3000`. The port can differ if another program is using 3000. The author should replace the address with the one shown by `npm run dev`.
+The live site is https://taskflow-gules-eight-93.vercel.app/. A common local address is `http://localhost:3000`. The port can differ if another program is using 3000. The author should replace the local address with the one shown by `npm run dev`.
 
 ### 6.1 Access TaskFlow
 
@@ -527,14 +535,14 @@ The checkbox marks the task completed. Choosing it again sets the status back to
 2. Select a JPG, PNG, WEBP, or GIF file of 2 MB or less.
 3. Wait for “Profile photo updated.”
 
-If this step fails, the task list is unchanged. This feature had not been clicked through in the browser when this manual was written, so the author should try it and attach a screenshot.
+If the file is rejected, the page shows the validation message, such as “Use a JPG, PNG, WEBP, or GIF image.” or “Image must be 2 MB or smaller.” The task list is unchanged. The author reported that upload works locally. A screenshot is still not stored in the repository.
 
 ### 6.11 Errors and email
 
 - Red text under a field is a validation message.
 - “Please log in first.” means the session is missing. The task screens send the browser to login on HTTP 401.
 - “Request failed. Check your connection and try again.” means the browser could not complete the request.
-- A creation email is sent only to the email address on the signed-in account. If email is not configured, or the provider rejects it, the task can still be created. The user does not see an email-failure message in the dashboard. The server log contains the failure.
+- A creation email is sent only to the email address on the signed-in account. If email is not configured, or the provider rejects it, the task can still be created. The user does not see an email-failure message in the dashboard. The server log contains the failure. Delivery on the live site has not been recorded as verified.
 
 ### 6.12 Screenshots still required
 
@@ -563,7 +571,7 @@ No screenshot files are stored in the repository. Insert the following captures 
 
 ### 7.2 Clone the repository
 
-This working copy had no Git remote configured when the documentation was written. After the project is pushed, clone it with the URL from the host:
+This project’s `origin` remote is configured. Clone the repository URL from that host:
 
 ```bash
 git clone <repository-url>
@@ -581,7 +589,9 @@ npm install
 Create a file named `.env` in the project root. Do not commit it. Use placeholders, not real secrets, in any shared document.
 
 ```text
-MONGODB_URI=<mongodb-connection-string>
+MONGODB_URI=<local-mongodb-connection-string>
+MONGODB_URI_DEV=<optional-development-connection-string>
+MONGODB_URI_PRO=<production-mongodb-connection-string>
 BETTER_AUTH_SECRET=<random-string-at-least-32-characters>
 BETTER_AUTH_URL=<public-base-url-of-this-app>
 RESEND_API_KEY=<resend-api-key>
@@ -589,13 +599,13 @@ EMAIL_FROM=<verified-sender-address>
 EMAIL_TEST_TO=<address-allowed-by-the-email-provider>
 ```
 
-`EMAIL_TEST_TO` is only for `scripts/send-test-email.ts`.
+`EMAIL_TEST_TO` is only for `scripts/send-test-email.ts`. Development uses `MONGODB_URI_DEV` when it is set, and otherwise `MONGODB_URI`. Production requires `MONGODB_URI_PRO` and does not fall back. For the live site, `BETTER_AUTH_URL` must be `https://taskflow-gules-eight-93.vercel.app`.
 
 ### 7.5 MongoDB
 
-Create or choose a cluster and a user that can read and write the `taskflow` database. Put the connection string in `MONGODB_URI`. The application selects the database name `taskflow` in code, in both `lib/db.ts` and `lib/mongoose.ts`.
+Create or choose a cluster and a user that can read and write the `taskflow` database. Put the local connection string in `MONGODB_URI` or `MONGODB_URI_DEV`. Put the production connection string in `MONGODB_URI_PRO`. The application selects the database name `taskflow` in code, in both `lib/db.ts` and `lib/mongoose.ts`. `lib/mongodb-uri.ts` chooses which variable to read.
 
-Better Auth will use its own collections in that database when a user registers. Mongoose will use the `tasks` collection when a task is created. No migration script is included.
+Better Auth will use its own collections in that database when a user registers. Mongoose will use the `tasks` collection when a task is created and the profile-photo collection when a photo is saved. No migration script is included.
 
 ### 7.6 Better Auth
 
@@ -627,11 +637,13 @@ npm run build
 
 | Symptom | What to check |
 | --- | --- |
-| `MONGODB_URI is missing from .env` | The variable is unset or the server was not restarted after editing `.env`. |
+| `MONGODB_URI_PRO is missing` | Production mode, including `npm run build`, does not have `MONGODB_URI_PRO`. |
+| `MONGODB_URI_DEV is missing` | Neither `MONGODB_URI_DEV` nor `MONGODB_URI` is set for development. |
+| Registration shows “Invalid origin” | `BETTER_AUTH_URL` does not match the site origin. On the live site it must be `https://taskflow-gules-eight-93.vercel.app`. |
 | Registration or login fails immediately | `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`, and that MongoDB is reachable. |
 | Dashboard redirects to login | The browser has no session. Sign in again. |
-| Task is created but no email arrives | `RESEND_API_KEY`, `EMAIL_FROM`, and whether the provider allows that recipient. Read the server log. The task route still returns 201. |
-| Profile photo does not appear | The upload request, the follow-up call to `/api/auth/update-user`, and write permission for `public/avatars`. |
+| Task is created but no email arrives | `RESEND_API_KEY`, `EMAIL_FROM`, and whether the provider allows that recipient. Read the server log. The task route still returns 201. Live delivery is not verified. |
+| Profile photo does not appear | The upload response, the follow-up call to `/api/auth/update-user`, and `GET /api/profile/avatar` for the same session. |
 | Internal error after `npm run build` | Restart the dev server so it can recreate its own `.next` files. |
 
 ## Chapter 8: Testing and Quality Assurance
@@ -640,8 +652,8 @@ There is no automated test suite. `package.json` has no `test` script. The table
 
 | Test ID | Feature | Preconditions | Steps | Expected result | Actual result | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T-01 | Typecheck | Dependencies installed | Run `npx tsc --noEmit` | Exit code 0 | Exit code 0 on 13 October 2026 after the profile-photo work | Observed | Command output from that local run |
-| T-02 | Production build | Dependencies installed | Run `npm run build` | Build completes | Exit code 0. Next.js 15.5.27 generated the App Router pages, including `/api/profile/avatar` | Observed | Build log from that local run. Image-tag warnings did not fail the build |
+| T-01 | Typecheck | Dependencies installed | Run `npx tsc --noEmit` | Exit code 0 | Exit code 0 on 13 October 2026, and again on 14 October 2026 after profile photos moved to MongoDB | Observed | Command output from those local runs |
+| T-02 | Production build | Dependencies installed | Run `npm run build` | Build completes | Exit code 0 on 13 October 2026 and again on 14 October 2026. Next.js 15.5.27 generated the App Router pages, including `/api/profile/avatar` | Observed | Build logs from those local runs. Image-tag warnings did not fail the build |
 | T-03 | Registration validation | Logged out, registration page open | Submit an empty form, a space-only name, an invalid email, and a short password | Each case shows a field message and does not create an account | Those messages were shown and the page stayed on registration | Observed | Browser check during development. Not a stored screenshot in the repo |
 | T-04 | Successful registration | A new email address | Submit valid fields | Account is created and the dashboard opens | Sign-up requests returned success in earlier local use. Not repeated as a scripted case for this report | Partial | Dev-server history, not a formal record |
 | T-05 | Login | An existing account | Sign in with the correct password | Dashboard opens | A development browser reached the dashboard after sign-in | Observed | Local session. Wrong-password requests also produced HTTP 401 in the dev log |
@@ -656,47 +668,47 @@ There is no automated test suite. `package.json` has no `test` script. The table
 | T-14 | Delete cancel | Signed in | Open delete and choose Cancel | Task remains | Cancel is implemented. A separate recorded click for this report was not kept | Not tested | Code in `DeleteTaskButton` |
 | T-15 | Other user’s task | Two accounts, one task owned by the first | From the second account, list, read, update, and delete the first account’s task | List omits it. Read, update, and delete return 404 | The developer reported that a second account could not list or read the original task. Update and delete across accounts were not recorded as finished | Partial | Developer report. Not re-run for this document |
 | T-16 | Invalid status | Signed in | PUT `status` set to a value outside the enum | HTTP 400 and the task is unchanged | The route contains that check. A 400 was seen in earlier API experiments. The response body was not always saved | Partial | Code and incomplete earlier logs |
-| T-17 | Email success | Resend allows the recipient | Create a task | Provider accepts the message and the task is still saved | Delivery was reported during development. It was not repeated for this report | Not retested | Script `scripts/send-test-email.ts` exists |
+| T-17 | Email success | Resend allows the recipient | Create a task | Provider accepts the message and the task is still saved | Delivery was reported during development. It was not repeated for this report, and live-site delivery is not recorded as verified | Not retested | Script `scripts/send-test-email.ts` exists |
 | T-18 | Email failure still saves | Provider rejects the recipient or the key | Create a task | HTTP 201 and an error in the server log | A create returned 201 while the server logged a Resend error | Observed | Dev log from a local create. Do not copy the provider’s address into the report |
-| T-19 | Profile photo | Signed in | Upload a small PNG | Photo appears and survives refresh | Not run | Not tested | Route and component exist |
+| T-19 | Profile photo | Signed in | Upload a small allowed image | Photo appears and survives refresh | The author reported on 14 October 2026 that upload works locally and that the live site’s main features were tested. This report did not repeat the click or store a screenshot | Reported | Author statement. Route stores the image in MongoDB |
 | T-20 | Profile photo rejection | Signed in | Upload a non-image or a file over 2 MB | HTTP 400 and no user-image change | Not run | Not tested | Checks exist in the avatar route |
 | T-21 | Narrow layout | Signed in | View around 390 CSS pixels wide | No horizontal overflow. Menu opens and contains Log out | An earlier dashboard layout was checked at 390 pixels. This exact profile-photo revision was not rechecked in the browser | Partial | Earlier local check |
-| T-22 | Production host | A real deployment | Open the live URL, sign in, create a task | Same behavior as local, with production env vars | No live URL was verified | Not tested | No `vercel.json` and no confirmed deployment |
+| T-22 | Production host | The live site | Sign in and use the main task and profile features | Same behavior as local, with production env vars | The author reported on 14 October 2026 that those features were tested at https://taskflow-gules-eight-93.vercel.app/. No screenshot was added. Email delivery is not part of this result | Reported | Author statement on 14 October 2026 |
 
 ## Chapter 9: Deployment
 
-TaskFlow is a Next.js application and can be deployed to Vercel because that host runs Next.js. **This repository was not verified as a live deployment.** There is no `vercel.json`, and `git remote` showed no configured remote when this report was written. Do not write that the project is deployed.
+The live site is https://taskflow-gules-eight-93.vercel.app/. The author reported on 14 October 2026 that the main account, task, and profile-photo features were tested there. This chapter does not add screenshots. There is no `vercel.json`. The repository has an `origin` remote. Creation-email delivery on the live site has not been recorded as verified.
 
 ### 9.1 Local development versus production
 
 | Topic | Local | Production |
 | --- | --- | --- |
-| How it starts | `npm run dev` | The host runs the output of `npm run build` |
-| URL | The dev server’s localhost URL | The host’s public URL |
-| `BETTER_AUTH_URL` | Must match the local URL, including port | Must match the public URL |
-| MongoDB | A development database | A database the host can reach. Do not point production at a disposable test database unless that is intended |
-| Email | May use Resend’s test limits | Needs a sender Resend allows for real recipients |
-| Profile files | Written to local `public/avatars` | A serverless host may not keep those files. This is an open deployment risk |
+| How it starts | `npm run dev` | Vercel runs the output of `npm run build` |
+| URL | The dev server’s localhost URL | https://taskflow-gules-eight-93.vercel.app/ |
+| `BETTER_AUTH_URL` | Must match the local URL, including port | Must be `https://taskflow-gules-eight-93.vercel.app` |
+| MongoDB | `MONGODB_URI_DEV`, or `MONGODB_URI` if that is unset | `MONGODB_URI_PRO` only. The database name in code remains `taskflow` |
+| Email | May use Resend’s test limits | Needs a sender Resend allows for real recipients. Live delivery is not verified |
+| Profile photos | MongoDB document for the signed-in user | The same MongoDB design. No writable `public/avatars` directory is required |
 
 ### 9.2 Vercel outline
 
-These are the usual host steps. They were not executed for this report.
-
-1. Push the project to a Git host.
-2. Import the repository in Vercel.
-3. Set the environment variables from Chapter 7. Do not set `EMAIL_TEST_TO` unless the test script will run on the host.
-4. Deploy.
+1. The project is already connected to a Git remote and to Vercel.
+2. Production environment variables are `MONGODB_URI_PRO`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and, if email should be attempted, `RESEND_API_KEY` and `EMAIL_FROM`.
+3. Do not set `EMAIL_TEST_TO` unless the test script will run on the host.
+4. `BETTER_AUTH_URL` must be the public origin with no path. A mismatch returns “Invalid origin”.
 5. Open the public URL, register or log in, create a task, and confirm that another account cannot see it.
-6. Confirm the creation email only if the sender and recipient are allowed.
+6. Confirm the creation email only after a message is actually received. That confirmation is still missing.
 
 ### 9.3 Post-deployment checks
+
+The author reported that the main live features were used on 14 October 2026. The checks below remain the expected behavior:
 
 - Home, login, and registration load.
 - `/dashboard` redirects when logged out.
 - Creating a task returns the task to the owner.
 - Logout works.
 - Server logs do not print secrets.
-- Profile upload either works on the host’s filesystem or is documented as unsupported until file storage is changed.
+- Profile upload stores the image in MongoDB and `GET /api/profile/avatar` returns it to the same user.
 
 ## Chapter 10: Security, Limitations, and Future Improvements
 
@@ -706,30 +718,30 @@ These are the usual host steps. They were not executed for this report.
 - The dashboard and every task route require a session.
 - Task reads and writes include the session user id.
 - Registration passwords are checked by Better Auth as well as the form.
-- Uploaded avatars are type-checked and size-limited, and the file name is derived from the user id.
+- Uploaded avatars are type-checked and size-limited, stored against the session user id, and returned only to that user.
 - `.env` files are gitignored.
 
 ### 10.2 Risks and limitations
 
-- No security audit was performed. This report does not say the application is fully secure or production-ready.
-- Profile images on a serverless host may disappear or be shared across instances in an unexpected way. The current design assumes a writable `public` directory.
+- No security audit was performed. This report does not say the application is fully secure or production-ready in every respect.
 - There is no automated authorization test in the repository.
 - Invalid id responses differ between DELETE and the other task methods.
 - The home page and dashboard do not share one visual system.
-- Email failure is invisible to the user. That is intentional so that a mail outage does not block task creation, but the user is not told that the message failed.
+- Email failure is invisible to the user. That is intentional so that a mail outage does not block task creation, but the user is not told that the message failed. Live-site delivery has not been recorded as verified.
 - Search runs only on tasks already loaded into the page.
+- A profile photo can be viewed only by the signed-in owner, because `GET /api/profile/avatar` checks the session.
 
 ### 10.3 Email configuration still required
 
-`RESEND_API_KEY` and `EMAIL_FROM` must be set. The sender must be one Resend will accept for the signed-in recipient. A failed send must not be described as a delivered email.
+`RESEND_API_KEY` and `EMAIL_FROM` must be set before a creation email can be accepted. The sender must be one Resend will accept for the signed-in recipient. A failed send must not be described as a delivered email. No record in this report shows that the live site successfully delivered a creation email.
 
 ### 10.4 Realistic future work
 
 - Due dates and priorities, as a separate change to the task model, API, and forms.
-- Store profile images in an object store if the app is deployed to a serverless host.
 - Add automated tests for ownership and validation.
 - Show the user when email fails, without failing the create request.
 - Align DELETE’s invalid-id response with GET and PUT if a consistent message is wanted.
+- Record a received creation email from the live site, without copying addresses or secrets into the report.
 
 ## Chapter 11: Conclusion
 
@@ -737,7 +749,7 @@ TaskFlow is a personal task web application. A visitor can register and log in. 
 
 What was learned cannot be stated as the author’s personal reflection, because that reflection was not supplied. The repository does show a working split between a React interface, Next.js routes, Better Auth, Mongoose, and Resend.
 
-Evidence of a typecheck and a production build exists from local commands on 13 October 2026. Several dashboard flows were also seen locally. Profile-photo upload, a full cross-account update and delete test, and a live deployment were not established by this report.
+Evidence of a typecheck and a production build exists from local commands on 13 October 2026 and again on 14 October 2026. Several dashboard flows were also seen locally. The author reported on 14 October 2026 that the live site at https://taskflow-gules-eight-93.vercel.app/ was used to test the main account, task, and profile-photo features. Screenshots are not in the repository. A full cross-account update and delete test, profile-photo rejection, and live email delivery were not established by this report.
 
 Future work can add due dates and priorities without pretending those fields exist today.
 
@@ -781,10 +793,11 @@ See section 5.9. Do not paste values.
 
 | Evidence | Where it lives |
 | --- | --- |
-| Typecheck and build output | Local terminal on 13 October 2026. Not committed as a file |
+| Typecheck and build output | Local terminal on 13 and 14 October 2026. Not committed as a file |
 | Browser observations | Described in Chapter 8. Screenshots are not in the repository |
 | Email failure with a successful create | Development server log. Do not archive the log if it contains a personal address |
-| Missing evidence | Profile upload, full cross-user update and delete, live deployment, author-owned screenshots |
+| Live site | https://taskflow-gules-eight-93.vercel.app/. Author reported main-feature testing on 14 October 2026. Email delivery is not verified |
+| Missing evidence | Profile-photo rejection, full cross-user update and delete, a received live creation email, author-owned screenshots |
 
 ## Appendix E: Screenshot index
 

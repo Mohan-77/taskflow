@@ -2,7 +2,7 @@
 
 TaskFlow is a personal task web application. A registered user can create, search, filter, edit, complete, and delete only their own tasks. Creating a task tries to email that user. The user can also upload a profile photo.
 
-This repository is a course project. It is not a verified public deployment.
+The live site is [https://taskflow-gules-eight-93.vercel.app/](https://taskflow-gules-eight-93.vercel.app/).
 
 ## Features that are implemented
 
@@ -14,8 +14,8 @@ This repository is a course project. It is not a verified public deployment.
 - Browser search across titles and descriptions, combined with status filters.
 - Four counts: total, completed, pending, and in progress.
 - A confirmation dialog before delete.
-- Profile photo upload stored as a file plus a URL on the user record.
-- A creation email that does not block the save if sending fails.
+- Profile photo upload stored in MongoDB for the signed-in user, then shown from `/api/profile/avatar`.
+- A creation email that does not block the save if sending fails. Delivery of that email on the live site has not been recorded as verified.
 
 ## Not implemented
 
@@ -23,7 +23,6 @@ This repository is a course project. It is not a verified public deployment.
 - A scheduling calendar.
 - Magic-link login.
 - An automated test suite.
-- A verified production deployment.
 
 ## Technology
 
@@ -48,13 +47,17 @@ npm install
 Create `.env` in the project root. Do not commit it.
 
 ```text
-MONGODB_URI=<mongodb-connection-string>
+MONGODB_URI=<local-mongodb-connection-string>
+MONGODB_URI_DEV=<optional-development-connection-string>
+MONGODB_URI_PRO=<production-mongodb-connection-string>
 BETTER_AUTH_SECRET=<random-string-at-least-32-characters>
-BETTER_AUTH_URL=<base-url-including-port>
+BETTER_AUTH_URL=<base-url-including-protocol-and-port>
 RESEND_API_KEY=<resend-api-key>
 EMAIL_FROM=<sender-address>
 EMAIL_TEST_TO=<address-for-the-test-script-only>
 ```
+
+Development uses `MONGODB_URI_DEV` when it is set, and otherwise `MONGODB_URI`. Production uses `MONGODB_URI_PRO` only. On the live site, `BETTER_AUTH_URL` must be `https://taskflow-gules-eight-93.vercel.app` with no path.
 
 ```bash
 npm run dev

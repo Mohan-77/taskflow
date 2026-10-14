@@ -1,10 +1,11 @@
 # TaskFlow Test Plan
 
-**Date of this plan:** 13 October 2026
+**Date of this plan:** 14 October 2026. Earlier local results from 13 October 2026 are kept. The live site is https://taskflow-gules-eight-93.vercel.app/.
 
 There is no automated suite. Status values mean:
 
 - **Observed:** a local development session recorded this result. It is not a stored screenshot in the repository.
+- **Reported:** the author stated the result on 14 October 2026. This plan does not repeat that test or store a screenshot.
 - **Partial:** some evidence exists, or only part of the case was seen.
 - **Not tested:** the code exists, but this result was not recorded.
 - **Not retested:** someone reported an earlier result, and it was not repeated for this document.
@@ -17,8 +18,8 @@ These IDs match Chapter 8 of the project report. Do not renumber them.
 
 | ID | Feature | Preconditions | Steps | Expected result | Actual result | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| T-01 | Typecheck | Dependencies installed | `npx tsc --noEmit` | Exit 0 | Exit 0 on 13 October 2026 | Observed |
-| T-02 | Production build | Dependencies installed | `npm run build` | Build completes | Exit 0. Next.js 15.5.27 included `/api/profile/avatar`. Image-tag warnings did not fail the build | Observed |
+| T-01 | Typecheck | Dependencies installed | `npx tsc --noEmit` | Exit 0 | Exit 0 on 13 October 2026, and again on 14 October 2026 after profile photos moved to MongoDB | Observed |
+| T-02 | Production build | Dependencies installed | `npm run build` | Build completes | Exit 0 on 13 October 2026, and again on 14 October 2026. Next.js 15.5.27 included `/api/profile/avatar`. Image-tag warnings did not fail the build | Observed |
 | T-03 | Registration validation | Logged out | Submit empty, space-only name, bad email, short password | Field errors, no account | Messages shown. Stayed on the registration page | Observed |
 | T-04 | Successful registration | New email | Submit valid data | Dashboard opens | Earlier local sign-up succeeded. Not scripted for this plan | Partial |
 | T-05 | Login | Existing account | Correct password | Dashboard opens | A development browser reached the dashboard. A wrong password also produced HTTP 401 in the dev log. The login error text was not archived | Observed |
@@ -33,12 +34,12 @@ These IDs match Chapter 8 of the project report. Do not renumber them.
 | T-14 | Delete cancel | Signed in | Open the dialog and choose Cancel | Row remains | Implemented. A separate recorded click was not kept | Not tested |
 | T-15 | Other user’s task | Two accounts | From the second account, list, read, update, and delete the first user’s task | Omitted from the list. Read, update, and delete return 404 | Developer reported that list and read failed for the other account. Update and delete across accounts were not recorded as finished | Partial |
 | T-16 | Invalid status | Signed in | PUT a status outside the enum, such as `done` | 400 and the task is unchanged | The route has the check. Earlier 400 logs did not keep the response body | Partial |
-| T-17 | Email success | Resend allows the recipient | Create a task | Provider accepts the message and the task is saved | Delivery was reported during development. Not repeated | Not retested |
+| T-17 | Email success | Resend allows the recipient | Create a task | Provider accepts the message and the task is saved | Delivery was reported during development. It was not repeated, and live-site delivery is not recorded as verified | Not retested |
 | T-18 | Email failure still saves | Provider rejects the send | Create a task | HTTP 201 and a server log line | A local create returned 201 while Resend logged an error | Observed |
-| T-19 | Profile photo | Signed in, small PNG | Upload | Photo shows after refresh | Not run | Not tested |
+| T-19 | Profile photo | Signed in, small image of an allowed type | Upload | Photo shows after refresh | The author reported on 14 October 2026 that upload works locally and that the live site’s main features, including profile photos, were tested. This plan did not repeat the click | Reported |
 | T-20 | Profile photo rejection | Signed in | Non-image or a file over 2 MB | HTTP 400 and no user-image change | Not run | Not tested |
 | T-21 | Narrow layout | Signed in | View around 390 CSS pixels wide | No horizontal overflow. Menu contains Log out | Checked on an earlier dashboard revision, not this photo revision | Partial |
-| T-22 | Production host | A real deployment | Sign in and create a task | Same rules as local | No live URL verified | Not tested |
+| T-22 | Production host | The live site | Sign in and use the main task and profile features | Same ownership and validation rules as local | The author reported on 14 October 2026 that those features were tested at https://taskflow-gules-eight-93.vercel.app/. No screenshot or per-request log was added here. Email delivery is not part of this result | Reported |
 
 ## Evidence still required
 
@@ -48,8 +49,7 @@ These IDs match Chapter 8 of the project report. Do not renumber them.
 - T-14, cancel on the delete dialog.
 - T-15, a repeated second-account list and read, plus PUT and DELETE that return 404 and leave the task unchanged.
 - T-16, an invalid status response body and confirmation that the task did not change.
-- T-17, an email the provider accepts.
-- T-19 and T-20, profile upload success and rejection.
+- T-17, an email the provider accepts, including on the live site. This is not verified.
+- T-20, profile-photo rejection for a non-image or a file over 2 MB.
 - T-21, the current layout at phone width.
-- T-22, a live host, only after a real deployment.
-- The author’s own execution notes if the teacher requires personal testing rather than this development log.
+- A written note of the live-site checks if the teacher requires the author’s own lab record. The author’s 14 October 2026 report is noted under T-19 and T-22, but screenshots are still absent.

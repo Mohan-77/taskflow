@@ -2,7 +2,7 @@
 
 Use this list before handing the project to a teacher. Placeholders in the report must be replaced with real academic details. Do not invent research results to make the list look finished.
 
-**Documentation date:** 13 October 2026
+**Documentation date:** 14 October 2026. The live site is https://taskflow-gules-eight-93.vercel.app/.
 
 ## Documents completed
 
@@ -14,7 +14,7 @@ Use this list before handing the project to a teacher. Placeholders in the repor
 | `docs/USER_GUIDE.md` | Written from the implemented screens |
 | `docs/TECHNICAL_DOCUMENTATION.md` | Written from the current routes and models |
 | `docs/TEST_PLAN.md` | Written. Many rows are not fully tested |
-| `docs/DEPLOYMENT_GUIDE.md` | Written as a procedure. Deployment was not performed |
+| `docs/DEPLOYMENT_GUIDE.md` | Updated for the live Vercel site. Email delivery there is not verified |
 | `docs/SUBMISSION_CHECKLIST.md` | This file |
 
 ## Details only the author can supply
@@ -51,10 +51,10 @@ None are stored in the repository. Capture these from the running app. Crop out 
 - [ ] T-14 Delete cancellation
 - [ ] T-15 Second account cannot list or read another user’s task, and PUT and DELETE return 404 without changing the task
 - [ ] T-16 Invalid status body and an unchanged task
-- [ ] T-17 Email that the provider accepts
-- [ ] T-19 and T-20 Profile photo success and rejection
+- [ ] T-17 Email that the provider accepts, including on the live site
+- [ ] T-20 Profile photo rejection
 - [ ] T-21 Current layout at phone, tablet, and desktop widths
-- [ ] T-22 Live deployment, only after a real deploy
+- [ ] Your own written notes if the course requires a personal test log. The author reported on 14 October 2026 that the main live-site features were tested. Screenshots are still missing.
 
 Observed local results for typecheck, build, registration validation, login, logout, create, edit, delete, and one email failure are already described in `docs/TEST_PLAN.md`. Replace them with your own evidence if the teacher requires that.
 
@@ -69,11 +69,11 @@ Observed local results for typecheck, build, registration validation, login, log
 
 - [ ] Due dates and priorities are not implemented. They are future work.
 - [ ] Categories, calendar scheduling, teams, and magic-link login are not implemented.
-- [ ] Profile photo upload is implemented and not browser-tested in this documentation pass.
+- [ ] Profile photo rejection (T-20) is not recorded.
 - [ ] `GET /api/tasks` exists, but the dashboard loads tasks with `Task.find` instead.
 - [ ] DELETE and GET/PUT disagree on the status code for an invalid task id.
-- [ ] The app is not verified on a public host.
-- [ ] Profile files depend on a writable `public/avatars` directory.
+- [ ] The live site is https://taskflow-gules-eight-93.vercel.app/. The author reported testing the main features there on 14 October 2026. Screenshots are not in the repository.
+- [ ] Creation-email delivery on the live site is not verified.
 - [ ] `npx tsx scripts/send-test-email.ts` depends on `tsx`, which is not listed in `package.json`.
 
 ## Final checks

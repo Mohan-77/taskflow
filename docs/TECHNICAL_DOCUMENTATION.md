@@ -1,6 +1,6 @@
 # TaskFlow Technical Documentation
 
-Architecture and API reference for the repository as inspected on 13 October 2026. The narrative report is [TaskFlow_Project_Report.md](./TaskFlow_Project_Report.md).
+Architecture and API reference for the repository as updated on 14 October 2026. The live site is https://taskflow-gules-eight-93.vercel.app/. The narrative report is [TaskFlow_Project_Report.md](./TaskFlow_Project_Report.md).
 
 ## Architecture
 
@@ -11,19 +11,18 @@ flowchart LR
   Auth[Better Auth]
   Mongo[(MongoDB database taskflow)]
   Resend[Resend]
-  Disk[public/avatars]
 
   Browser --> Next
   Next --> Auth
   Auth --> Mongo
   Next --> Mongo
   Next --> Resend
-  Next --> Disk
 ```
 
 - Better Auth uses the native MongoDB driver in `lib/db.ts`.
-- Tasks use Mongoose in `lib/mongoose.ts`.
+- Tasks and profile photos use Mongoose in `lib/mongoose.ts`.
 - Both use the database name `taskflow`.
+- `lib/mongodb-uri.ts` selects `MONGODB_URI_PRO` in production. In development it uses `MONGODB_URI_DEV` when set, otherwise `MONGODB_URI`.
 - `mongodbAdapter(db)` does not pass a MongoClient, so the adapter’s transaction helper is not enabled.
 
 ## Project structure
@@ -38,7 +37,7 @@ flowchart LR
 | `app/api/auth/[...all]/route.ts` | `toNextJsHandler(auth)` |
 | `app/api/tasks/route.ts` | `GET` list, `POST` create |
 | `app/api/tasks/[id]/route.ts` | `GET`, `PUT`, `DELETE` |
-| `app/api/profile/avatar/route.ts` | `POST` profile image file |
+| `app/api/profile/avatar/route.ts` | `GET` and `POST` for the signed-in user’s profile image |
 | `components/auth/*` | Login, register, logout |
 | `components/dashboard/DashboardView.tsx` | Client dashboard: search, filters, counts, create dialog |
 | `components/dashboard/ProfilePhoto.tsx` | Upload control |
@@ -47,6 +46,8 @@ flowchart LR
 | `lib/auth-client.ts` | `createAuthClient` |
 | `lib/session.ts` | Cached `getServerSession` |
 | `lib/models/Task.ts` | Task schema |
+| `lib/models/ProfilePhoto.ts` | Profile-photo schema |
+| `lib/mongodb-uri.ts` | MongoDB URI selection |
 | `lib/email.ts` | `sendTaskCreatedEmail` |
 | `scripts/send-test-email.ts` | Developer-only email check |
 
@@ -91,11 +92,15 @@ Accepts any subset of `title`, `description`, and `status`. At least one must be
 
 Invalid ObjectId: 404 “Task not found.” before `connectMongoose`. This differs from GET and PUT, which use 400. Owned match: `{ success: true }` after `findOneAndDelete`. Otherwise 404.
 
+### `GET /api/profile/avatar`
+
+Session required. Returns the signed-in user’s saved image bytes. Missing photo: 404 “No profile photo is saved.” Database failure: 500 “Could not load the profile photo.” The response is private and is not a public file.
+
 ### `POST /api/profile/avatar`
 
-Multipart field `image`. Maximum 2 MB. JPG, PNG, GIF, or WEBP, checked by MIME type and file bytes. Writes `public/avatars/<sanitizedUserId>.<ext>`. Returns `{ success: true, image }`.
+Multipart field `image`. Maximum 2 MB. JPG, PNG, GIF, or WEBP, checked by MIME type and file bytes. Upserts one MongoDB document for `session.user.id`, so a replacement does not create a second document. Returns `{ success: true, image: "/api/profile/avatar?v=<time>" }`. Invalid file: 400. Database failure: 500 “Could not save the profile photo.”
 
-The browser then calls Better Auth `POST /api/auth/update-user` with `{ image }` so the URL is stored on the user and the session cookie is updated.
+The browser then calls Better Auth `POST /api/auth/update-user` with `{ image }` so that URL is stored on the user and the session cookie is updated.
 
 ### Auth routes
 
@@ -115,7 +120,7 @@ The browser then calls Better Auth `POST /api/auth/update-user` with `{ image }`
 
 ### Better Auth data
 
-User, session, and account documents are created by the MongoDB adapter, not by a Mongoose model in this repo. The user `image` field is a string URL when a photo has been saved. Do not document live user records here.
+User, session, and account documents are created by the MongoDB adapter, not by a Mongoose model in this repo. The user `image` field stores the profile-photo URL `/api/profile/avatar?v=<time>` after a successful upload. The bytes are stored through the Mongoose model `ProfilePhoto`. Mongoose uses `profilephotos` as the default MongoDB collection name for that model. Each document is keyed by a unique `userId`. Do not document live user records here.
 
 ## Authentication
 
@@ -136,10 +141,12 @@ Registration password length uses Better Auth’s library default of 8 to 128 ch
 
 | Variable | Required for | Notes |
 | --- | --- | --- |
-| `MONGODB_URI` | Auth and tasks | Missing value throws at import |
+| `MONGODB_URI` | Local development | Used when `MONGODB_URI_DEV` is unset |
+| `MONGODB_URI_DEV` | Local development | Optional override of `MONGODB_URI` |
+| `MONGODB_URI_PRO` | Production | Required when `NODE_ENV` is `production`. No fallback |
 | `BETTER_AUTH_SECRET` | Auth | Not passed in code. Use at least 32 characters |
-| `BETTER_AUTH_URL` | Auth callbacks | Should match the site origin, including port |
-| `RESEND_API_KEY` | Email | Server only |
+| `BETTER_AUTH_URL` | Auth origin check | Must exactly match the site origin. Live value: `https://taskflow-gules-eight-93.vercel.app` |
+| `RESEND_API_KEY` | Email | Server only. Delivery on the live site is not recorded as verified |
 | `EMAIL_FROM` | Email | Must be a sender Resend allows |
 | `EMAIL_TEST_TO` | `scripts/send-test-email.ts` only | Not used by the task route |
 
@@ -158,4 +165,4 @@ npm run build
 
 ## Deployment note
 
-No deployment file is in the repository, and no live URL was verified. Profile files written under `public/avatars` are a local-disk design. See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
+The live site is https://taskflow-gules-eight-93.vercel.app/. There is still no `vercel.json`. Profile photos are MongoDB documents, not files under `public/avatars`. See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
