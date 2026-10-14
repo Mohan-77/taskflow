@@ -133,6 +133,7 @@ export default function DashboardView({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const photoSrc = image?.startsWith("/api/profile/avatar") ? image : null;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -246,7 +247,7 @@ export default function DashboardView({
         <ProfilePhoto
           name={name}
           email={email}
-          image={image}
+          image={photoSrc}
           onNotice={showNotice}
         />
         <LogoutButton
@@ -312,8 +313,8 @@ export default function DashboardView({
               onClick={() => setSidebarOpen(true)}
               className={`shrink-0 overflow-hidden rounded-full lg:hidden ${focusRing}`}
             >
-              {image ? (
-                <img src={image} alt="" className="h-9 w-9 object-cover" />
+              {photoSrc ? (
+                <img src={photoSrc} alt="" className="h-9 w-9 object-cover" />
               ) : (
                 <span className="flex h-9 w-9 items-center justify-center bg-violet-100 text-sm font-semibold text-violet-800">
                   {(name.trim()[0] || "T").toUpperCase()}

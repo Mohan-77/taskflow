@@ -1,11 +1,20 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { connectMongoose } from "@/lib/mongoose";
+import ProfilePhoto, {
+  PROFILE_PHOTO_TYPES,
+  type ProfilePhotoType,
+} from "@/lib/models/ProfilePhoto";
 
 const MAX_BYTES = 2 * 1024 * 1024;
-const EXTENSIONS = ["jpg", "png", "webp", "gif"] as const;
+
+const CONTENT_TYPES: Record<"png" | "jpg" | "gif" | "webp", ProfilePhotoType> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+};
 
 function extensionFor(bytes: Buffer, mime: string) {
   const isPng =
@@ -37,24 +46,102 @@ function extensionFor(bytes: Buffer, mime: string) {
   return null;
 }
 
-export async function POST(request: Request) {
+function isProfilePhotoType(value: string): value is ProfilePhotoType {
+  return PROFILE_PHOTO_TYPES.some((type) => type === value);
+}
+
+function errorName(error: unknown) {
+  return error instanceof Error ? error.name : "Error";
+}
+
+function isDuplicateKey(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === 11000
+  );
+}
+
+async function requireUser() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  return session.user;
+}
+
+async function saveProfilePhoto(
+  userId: string,
+  contentType: ProfilePhotoType,
+  data: Buffer
+) {
+  const update = { $set: { contentType, data } };
+
+  try {
+    await ProfilePhoto.findOneAndUpdate({ userId }, update, {
+      upsert: true,
+      setDefaultsOnInsert: true,
+    });
+  } catch (error) {
+    if (!isDuplicateKey(error)) {
+      throw error;
+    }
+
+    await ProfilePhoto.updateOne({ userId }, update);
+  }
+}
+
+export async function GET() {
+  const user = await requireUser();
+
+  if (!user) {
     return NextResponse.json(
       { success: false, message: "Please log in first." },
       { status: 401 }
     );
   }
 
-  const safeId = session.user.id.replace(/[^a-zA-Z0-9]/g, "");
+  try {
+    await connectMongoose();
 
-  if (!safeId) {
+    const photo = await ProfilePhoto.findOne({ userId: user.id });
+
+    if (!photo || !isProfilePhotoType(photo.contentType) || photo.data.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "No profile photo is saved." },
+        { status: 404 }
+      );
+    }
+
+    return new NextResponse(new Uint8Array(photo.data), {
+      headers: {
+        "Content-Type": photo.contentType,
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (error) {
+    console.error("Load profile photo error:", errorName(error));
+
     return NextResponse.json(
-      { success: false, message: "Could not save the profile photo." },
-      { status: 400 }
+      { success: false, message: "Could not load the profile photo." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  const user = await requireUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { success: false, message: "Please log in first." },
+      { status: 401 }
     );
   }
 
@@ -95,19 +182,20 @@ export async function POST(request: Request) {
     );
   }
 
-  const directory = path.join(process.cwd(), "public", "avatars");
-  await mkdir(directory, { recursive: true });
+  try {
+    await connectMongoose();
+    await saveProfilePhoto(user.id, CONTENT_TYPES[extension], bytes);
+  } catch (error) {
+    console.error("Save profile photo error:", errorName(error));
 
-  await Promise.all(
-    EXTENSIONS.map((current) =>
-      unlink(path.join(directory, `${safeId}.${current}`)).catch(() => undefined)
-    )
-  );
-
-  await writeFile(path.join(directory, `${safeId}.${extension}`), bytes);
+    return NextResponse.json(
+      { success: false, message: "Could not save the profile photo." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({
     success: true,
-    image: `/avatars/${safeId}.${extension}?v=${Date.now()}`,
+    image: `/api/profile/avatar?v=${Date.now()}`,
   });
 }

@@ -22,7 +22,9 @@ export default function ProfilePhoto({
 }) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const initial = (name.trim()[0] || "T").toUpperCase();
+  const photoSrc = image?.startsWith("/api/profile/avatar") ? image : null;
 
   async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -55,7 +57,7 @@ export default function ProfilePhoto({
         return;
       }
 
-      if (!response.ok || !data?.image) {
+      if (!response.ok || !data?.image?.startsWith("/api/profile/avatar")) {
         onNotice(data?.message || "Could not upload the photo.", "error");
         return;
       }
@@ -91,8 +93,13 @@ export default function ProfilePhoto({
     <div className="flex items-center gap-3">
       <label className="relative shrink-0 cursor-pointer">
         <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-violet-100 text-sm font-semibold text-violet-800">
-          {image ? (
-            <img src={image} alt="" className="h-full w-full object-cover" />
+          {photoSrc && failedSrc !== photoSrc ? (
+            <img
+              src={photoSrc}
+              alt=""
+              className="h-full w-full object-cover"
+              onError={() => setFailedSrc(photoSrc)}
+            />
           ) : (
             initial
           )}
